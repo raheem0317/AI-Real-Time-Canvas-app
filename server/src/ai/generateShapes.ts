@@ -17,7 +17,7 @@ Canvas size: 900 x 550 pixels.
 
 Rules:
 - Only "circle" and "rectangle" types allowed
-- Maximum 12 shapes total
+- Maximum 26 shapes total
 - Labels must be max 2 characters
 - Keep all shapes inside the canvas bounds (x: 30-870, y: 30-520)
 - For circles: include radius (15-40)
@@ -45,7 +45,8 @@ Respond with this exact JSON structure:
       "color": "#ec4899"
     }
   ]
-}`;
+}
+`;
 
 let model: GenerativeModel | null = null;
 
@@ -78,7 +79,7 @@ function getModel(): GenerativeModel | null {
 function validateNodes(raw: any[]): ShapeNode[] {
   const nodes: ShapeNode[] = [];
 
-  for (let i = 0; i < Math.min(raw.length, 12); i++) {
+  for (let i = 0; i < Math.min(raw.length, 26); i++) {
     const node = raw[i];
     if (!node || typeof node !== 'object') continue;
 

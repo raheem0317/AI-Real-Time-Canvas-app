@@ -5,10 +5,10 @@ import { useCanvasStore } from '../store/canvasStore';
 import { Sparkles, Send, Trash2, Command, CornerDownLeft } from 'lucide-react';
 
 const SAMPLE_PROMPTS = [
+  'All Alphabets (A-Z)',
   'Star layout with 7 nodes',
   '3x4 grid of circles',
   '4 rectangles in a row',
-  'Mixed shape star',
 ];
 
 const PromptInput: React.FC = () => {

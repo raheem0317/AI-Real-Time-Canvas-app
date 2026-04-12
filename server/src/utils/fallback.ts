@@ -42,7 +42,44 @@ function clampLabel(label: string): string {
  */
 function extractNumber(prompt: string, fallback: number): number {
   const match = prompt.match(/(\d+)/);
-  return match ? Math.min(parseInt(match[1], 10), 12) : fallback;
+  return match ? Math.min(parseInt(match[1], 10), 26) : fallback;
+}
+
+/**
+ * Special layout for the full alphabet (A-Z)
+ */
+function alphabetLayout(prompt: string): ShapeNode[] {
+  const lower = prompt.toLowerCase();
+  const nodes: ShapeNode[] = [];
+  const total = 26; // All alphabets
+  
+  const cols = 7;
+  const rows = Math.ceil(total / cols);
+  
+  const useRect = lower.includes('rect');
+  const paddingX = 80;
+  const paddingY = 80;
+  const spacingX = (CANVAS_W - 2 * paddingX) / (cols - 1);
+  const spacingY = (CANVAS_H - 2 * paddingY) / (rows - 1);
+
+  for (let i = 0; i < total; i++) {
+    const r = Math.floor(i / cols);
+    const c = i % cols;
+    
+    nodes.push({
+      id: genId(),
+      type: useRect ? 'rectangle' : 'circle',
+      x: paddingX + c * spacingX,
+      y: paddingY + r * spacingY,
+      radius: 20,
+      width: 50,
+      height: 40,
+      label: String.fromCharCode(65 + i), // A, B, C...
+      color: pickColor(i),
+    });
+  }
+  
+  return nodes;
 }
 
 /**
@@ -55,25 +92,25 @@ function starLayout(prompt: string): ShapeNode[] {
   // Determine total count
   let surrounding = 6;
   const surroundMatch = lower.match(/(\d+)\s*surround/);
-  if (surroundMatch) surrounding = Math.min(parseInt(surroundMatch[1], 10), 11);
+  if (surroundMatch) surrounding = Math.min(parseInt(surroundMatch[1], 10), 25);
 
   const totalMatch = lower.match(/(\d+)\s*node/);
   if (totalMatch && !surroundMatch) {
-    const total = Math.min(parseInt(totalMatch[1], 10), 12);
+    const total = Math.min(parseInt(totalMatch[1], 10), 26);
     surrounding = total - 1;
   }
 
   const numMatch = lower.match(/(\d+)\s*(?:circle|rect)/);
   if (numMatch && !surroundMatch && !totalMatch) {
-    surrounding = Math.min(parseInt(numMatch[1], 10), 11);
+    surrounding = Math.min(parseInt(numMatch[1], 10), 25);
   }
 
-  surrounding = Math.max(1, Math.min(surrounding, 11));
+  surrounding = Math.max(1, Math.min(surrounding, 25));
 
   const useRect = lower.includes('rect');
   const centerX = CANVAS_W / 2;
   const centerY = CANVAS_H / 2;
-  const radius = Math.min(CANVAS_W, CANVAS_H) * 0.3;
+  const radius = Math.min(CANVAS_W, CANVAS_H) * 0.35;
 
   // Center node
   nodes.push({
@@ -96,9 +133,9 @@ function starLayout(prompt: string): ShapeNode[] {
       type: useRect ? 'rectangle' : 'circle',
       x: centerX + radius * Math.cos(angle),
       y: centerY + radius * Math.sin(angle),
-      radius: SHAPE_R,
-      width: RECT_W,
-      height: RECT_H,
+      radius: SHAPE_R - 5,
+      width: RECT_W - 10,
+      height: RECT_H - 10,
       label: clampLabel(String.fromCharCode(65 + i)),
       color: pickColor(i + 1),
     });
@@ -124,12 +161,13 @@ function gridLayout(prompt: string): ShapeNode[] {
     rows = parseInt(gridMatch[2], 10);
   }
 
-  const total = Math.min(cols * rows, 12);
-  cols = Math.min(cols, 6);
-  rows = Math.ceil(total / cols);
+  const totalPossible = Math.min(cols * rows, 26);
+  cols = Math.min(cols, 8);
+  rows = Math.ceil(totalPossible / cols);
+  const total = Math.min(totalPossible, 26);
 
   const useRect = lower.includes('rect');
-  const paddingX = 100;
+  const paddingX = 80;
   const paddingY = 80;
   const spacingX = (CANVAS_W - 2 * paddingX) / Math.max(cols - 1, 1);
   const spacingY = (CANVAS_H - 2 * paddingY) / Math.max(rows - 1, 1);
@@ -142,9 +180,9 @@ function gridLayout(prompt: string): ShapeNode[] {
         type: useRect ? 'rectangle' : 'circle',
         x: paddingX + c * spacingX,
         y: paddingY + r * spacingY,
-        radius: SHAPE_R - 4,
-        width: RECT_W - 10,
-        height: RECT_H - 5,
+        radius: SHAPE_R - 8,
+        width: RECT_W - 20,
+        height: RECT_H - 15,
         label: clampLabel(String.fromCharCode(65 + count)),
         color: pickColor(count),
       });
@@ -163,12 +201,11 @@ function rowLayout(prompt: string): ShapeNode[] {
   const nodes: ShapeNode[] = [];
 
   const count = extractNumber(lower, 4);
-  const total = Math.min(count, 12);
+  const total = Math.min(count, 26);
   const useRect = lower.includes('rect');
   const useCircle = lower.includes('circle');
 
-  const paddingX = 100;
-  const spacing = (CANVAS_W - 2 * paddingX) / Math.max(total - 1, 1);
+  const paddingX = 60;
   const centerY = CANVAS_H / 2;
 
   // Check for "circle above center" pattern
@@ -183,9 +220,9 @@ function rowLayout(prompt: string): ShapeNode[] {
       type: useRect && !useCircle ? 'rectangle' : (useCircle ? 'circle' : 'rectangle'),
       x: paddingX + i * ((CANVAS_W - 2 * paddingX) / Math.max(mainCount - 1, 1)),
       y: centerY + 40,
-      radius: SHAPE_R,
-      width: RECT_W,
-      height: RECT_H,
+      radius: 18,
+      width: 45,
+      height: 35,
       label: clampLabel(String.fromCharCode(65 + i)),
       color: pickColor(i),
     });
@@ -197,9 +234,9 @@ function rowLayout(prompt: string): ShapeNode[] {
       type: 'circle',
       x: CANVAS_W / 2,
       y: centerY - 100,
-      radius: SHAPE_R,
-      width: RECT_W,
-      height: RECT_H,
+      radius: 20,
+      width: 50,
+      height: 40,
       label: clampLabel(String.fromCharCode(65 + mainCount)),
       color: pickColor(mainCount),
     });
@@ -217,11 +254,11 @@ function mixedLayout(prompt: string): ShapeNode[] {
 
   // Parse rectangle count
   const rectMatch = lower.match(/(\d+)\s*rect/);
-  const rectCount = rectMatch ? Math.min(parseInt(rectMatch[1], 10), 11) : 4;
+  const rectCount = rectMatch ? Math.min(parseInt(rectMatch[1], 10), 25) : 4;
 
   // Parse circle count
   const circleMatch = lower.match(/(\d+)\s*circle/);
-  const circleCount = circleMatch ? Math.min(parseInt(circleMatch[1], 10), 12 - rectCount) : 1;
+  const circleCount = circleMatch ? Math.min(parseInt(circleMatch[1], 10), 26 - rectCount) : 1;
 
   const paddingX = 120;
   const rectSpacing = (CANVAS_W - 2 * paddingX) / Math.max(rectCount - 1, 1);
@@ -233,8 +270,8 @@ function mixedLayout(prompt: string): ShapeNode[] {
       type: 'rectangle',
       x: paddingX + i * rectSpacing,
       y: rowY,
-      width: RECT_W,
-      height: RECT_H,
+      width: 45,
+      height: 35,
       label: clampLabel(String.fromCharCode(65 + i)),
       color: pickColor(i),
     });
@@ -249,7 +286,7 @@ function mixedLayout(prompt: string): ShapeNode[] {
       type: 'circle',
       x: circleCount === 1 ? CANVAS_W / 2 : paddingX + i * circleSpacing,
       y: circleY,
-      radius: SHAPE_R,
+      radius: 18,
       label: clampLabel(String.fromCharCode(65 + rectCount + i)),
       color: pickColor(rectCount + i),
     });
@@ -263,7 +300,7 @@ function mixedLayout(prompt: string): ShapeNode[] {
  */
 function defaultLayout(prompt: string): ShapeNode[] {
   const lower = prompt.toLowerCase();
-  const count = Math.min(extractNumber(lower, 5), 12);
+  const count = Math.min(extractNumber(lower, 5), 26);
   const useRect = lower.includes('rect');
   const nodes: ShapeNode[] = [];
 
@@ -280,9 +317,9 @@ function defaultLayout(prompt: string): ShapeNode[] {
         type: useRect ? 'rectangle' : 'circle',
         x: spacingX * (c + 1),
         y: spacingY * (r + 1),
-        radius: SHAPE_R,
-        width: RECT_W,
-        height: RECT_H,
+        radius: 20,
+        width: 50,
+        height: 40,
         label: clampLabel(String.fromCharCode(65 + idx)),
         color: pickColor(idx),
       });
@@ -298,6 +335,11 @@ function defaultLayout(prompt: string): ShapeNode[] {
  */
 export function generateShapesFallback(prompt: string): ShapeNode[] {
   const lower = prompt.toLowerCase();
+
+  // Detect alphabet request
+  if (lower.includes('alphabet') || lower.includes('a-z') || lower.includes('a to z') || lower.includes('26')) {
+    return alphabetLayout(prompt);
+  }
 
   // Detect mixed layouts like "4 rectangles in a row and 1 circle above"
   if (lower.includes('rect') && lower.includes('circle')) {
