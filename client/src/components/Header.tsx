@@ -1,32 +1,41 @@
 import React from 'react';
+import { motion } from 'framer-motion';
 import { useCanvasStore } from '../store/canvasStore';
+import { Activity, Radio } from 'lucide-react';
 
 const Header: React.FC = () => {
   const connected = useCanvasStore((s) => s.connected);
   const nodes = useCanvasStore((s) => s.nodes);
 
   return (
-    <header className="app-header">
-      <div className="header-left">
-        <div className="header-logo">
-          <span className="logo-icon">🎨</span>
-          <h1 className="logo-text">AI Canvas</h1>
+    <nav className="nav-bar">
+      <motion.div 
+        initial={{ y: -20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        className="logo-container"
+      >
+        <div className="logo-vibe">
+          <Activity size={18} color="white" strokeWidth={3} />
         </div>
-        <span className="header-badge">Real-Time</span>
-      </div>
+        <h1 className="logo-text">AI Canvas <span style={{ fontWeight: 400, opacity: 0.5 }}>OS</span></h1>
+      </motion.div>
 
-      <div className="header-right">
-        {nodes.length > 0 && (
-          <span className="shape-count">
-            {nodes.length} shape{nodes.length !== 1 ? 's' : ''}
-          </span>
-        )}
-        <div className={`connection-status ${connected ? 'connected' : 'disconnected'}`}>
-          <span className="status-dot" />
-          <span className="status-text">{connected ? 'Connected' : 'Disconnected'}</span>
+      <motion.div 
+        initial={{ y: -20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ delay: 0.1 }}
+        className="status-pills"
+      >
+        <div className="pill">
+          <span className="text-muted">{nodes.length}</span> Objects
         </div>
-      </div>
-    </header>
+        <div className={`pill ${connected ? 'active' : ''}`}>
+          <Radio size={14} />
+          {connected ? 'Live Sync' : 'Offline'}
+          {connected && <span className="status-dot" />}
+        </div>
+      </motion.div>
+    </nav>
   );
 };
 

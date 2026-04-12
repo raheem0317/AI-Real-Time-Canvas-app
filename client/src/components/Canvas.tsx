@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { Stage, Layer } from 'react-konva';
+import { motion, AnimatePresence } from 'framer-motion';
 import ShapeNodeComponent from './ShapeNode';
 import { useCanvasStore } from '../store/canvasStore';
 import { socketService } from '../socket/socket';
@@ -17,7 +18,13 @@ const Canvas: React.FC = () => {
     const handleResize = () => {
       if (containerRef.current) {
         const containerWidth = containerRef.current.offsetWidth;
-        const newScale = Math.min(containerWidth / CANVAS_WIDTH, 1);
+        const containerHeight = containerRef.current.offsetHeight;
+        
+        // Fit within viewport with padding
+        const scaleX = (containerWidth * 0.85) / CANVAS_WIDTH;
+        const scaleY = (containerHeight * 0.75) / CANVAS_HEIGHT;
+        const newScale = Math.min(scaleX, scaleY, 1.2); // Don't scale up too much
+        
         setScale(newScale);
         setContainerSize({
           width: CANVAS_WIDTH * newScale,
@@ -32,31 +39,27 @@ const Canvas: React.FC = () => {
   }, []);
 
   const handleDragEnd = (id: string, x: number, y: number) => {
-    // Clamp within canvas bounds
     const clampedX = Math.max(30, Math.min(CANVAS_WIDTH - 30, x));
     const clampedY = Math.max(30, Math.min(CANVAS_HEIGHT - 30, y));
-
-    // Update local state
     useCanvasStore.getState().updateNodePosition(id, clampedX, clampedY);
-
-    // Broadcast to other clients
     socketService.moveNode(id, clampedX, clampedY);
   };
 
   return (
-    <div className="canvas-container" ref={containerRef}>
-      <div className="canvas-wrapper" style={{ width: containerSize.width, height: containerSize.height }}>
-        {/* Grid background rendered as CSS */}
-        <div className="canvas-grid" />
+    <div className="canvas-viewport" ref={containerRef}>
+      <motion.div 
+        className="canvas-frame" 
+        style={{ width: containerSize.width, height: containerSize.height }}
+        layout
+      >
+        <div className="canvas-pattern" />
+        
         <Stage
           width={CANVAS_WIDTH}
           height={CANVAS_HEIGHT}
           scaleX={scale}
           scaleY={scale}
-          style={{
-            width: containerSize.width,
-            height: containerSize.height,
-          }}
+          style={{ width: containerSize.width, height: containerSize.height }}
         >
           <Layer>
             {nodes.map((node) => (
@@ -69,16 +72,23 @@ const Canvas: React.FC = () => {
           </Layer>
         </Stage>
 
-        {nodes.length === 0 && (
-          <div className="canvas-empty">
-            <div className="canvas-empty-icon">✨</div>
-            <p className="canvas-empty-text">Enter a prompt to generate shapes</p>
-            <p className="canvas-empty-hint">
-              Try: "Create a star layout with 1 center and 6 surrounding nodes"
-            </p>
-          </div>
-        )}
-      </div>
+        <AnimatePresence>
+          {nodes.length === 0 && (
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 1.1 }}
+              className="canvas-empty"
+            >
+              <div className="canvas-empty-icon" style={{ filter: 'drop-shadow(0 0 10px var(--primary-glow))' }}>✨</div>
+              <p className="canvas-empty-text">The canvas is yours.</p>
+              <p className="canvas-empty-hint">
+                Use the command bar below to generate your layout with AI.
+              </p>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
     </div>
   );
 };
