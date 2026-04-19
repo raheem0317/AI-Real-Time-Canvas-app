@@ -46,7 +46,7 @@ const Canvas: React.FC = () => {
   };
 
   return (
-    <div className="canvas-viewport" ref={containerRef}>
+    <div className="canvas-container-inner" ref={containerRef}>
       <motion.div 
         className="canvas-frame" 
         style={{ width: containerSize.width, height: containerSize.height }}

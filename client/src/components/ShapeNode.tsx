@@ -8,10 +8,6 @@ interface ShapeNodeComponentProps {
 }
 
 const ShapeNodeComponent: React.FC<ShapeNodeComponentProps> = ({ node, onDragEnd }) => {
-  const handleDragEnd = (e: any) => {
-    const { x, y } = e.target.position();
-    onDragEnd(node.id, x, y);
-  };
 
   const handleMouseEnter = (e: any) => {
     const stage = e.target.getStage();
@@ -26,8 +22,29 @@ const ShapeNodeComponent: React.FC<ShapeNodeComponentProps> = ({ node, onDragEnd
   const handleDragStart = (e: any) => {
     const stage = e.target.getStage();
     if (stage) stage.container().style.cursor = 'grabbing';
-    // Bring to front
+    
+    // Visual feedback: Scale up slightly and bring to top
+    e.target.to({
+      scaleX: 1.1,
+      scaleY: 1.1,
+      duration: 0.1,
+    });
     e.target.moveToTop();
+  };
+
+  const handleDragEndNode = (e: any) => {
+    const stage = e.target.getStage();
+    if (stage) stage.container().style.cursor = 'grab';
+    
+    // Scale back down
+    e.target.to({
+      scaleX: 1,
+      scaleY: 1,
+      duration: 0.1,
+    });
+
+    const { x, y } = e.target.position();
+    onDragEnd(node.id, x, y);
   };
 
   // Calculate text position relative to group origin (0,0)
@@ -50,8 +67,8 @@ const ShapeNodeComponent: React.FC<ShapeNodeComponentProps> = ({ node, onDragEnd
     <Group
       x={node.x}
       y={node.y}
-      draggable
-      onDragEnd={handleDragEnd}
+      draggable={true}
+      onDragEnd={handleDragEndNode}
       onDragStart={handleDragStart}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}

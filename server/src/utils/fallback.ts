@@ -57,8 +57,8 @@ function alphabetLayout(prompt: string): ShapeNode[] {
   const rows = Math.ceil(total / cols);
   
   const useRect = lower.includes('rect');
-  const paddingX = 80;
-  const paddingY = 80;
+  const paddingX = 100;
+  const paddingY = 100;
   const spacingX = (CANVAS_W - 2 * paddingX) / (cols - 1);
   const spacingY = (CANVAS_H - 2 * paddingY) / (rows - 1);
 

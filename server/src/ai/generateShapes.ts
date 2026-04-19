@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI, GenerativeModel } from '@google/generative-ai';
+import Groq from 'groq-sdk';
 import { ShapeNode } from '../types/index.js';
 import { generateShapesFallback } from '../utils/fallback.js';
 import { v4Fallback } from '../utils/helpers.js';
@@ -9,66 +10,76 @@ const COLORS = [
   '#14b8a6', '#ef4444',
 ];
 
-const SYSTEM_PROMPT = `You are a canvas shape generator AI. The user will describe a layout of shapes they want on a canvas.
+const SYSTEM_PROMPT = `You are a Senior Canvas Architect. Your goal is to generate perfectly balanced, geometric layouts for a 900x550 canvas.
 
-You MUST respond with ONLY valid JSON — no markdown, no explanation, no code blocks.
+COORDINATE GUIDE:
+(30, 30)      [Top Left]      | (450, 30)   [Top Center]    | (870, 30)    [Top Right]
+(30, 275)     [Mid Left]      | (450, 275)  [Center]        | (870, 275)   [Mid Right]
+(30, 520)     [Bottom Left]   | (450, 520)  [Bottom Center] | (870, 520)   [Bottom Right]
 
-Canvas size: 900 x 550 pixels.
+CRITICAL RULES:
+1. OUTPUT ONLY VALID JSON.
+2. CANVAS BOUNDS: x(30-870), y(30-520).
+3. NEVER CLUMP NODES: Maintain at least 100px between shape centers unless specified.
+4. SYMMETRY: For stars/circles, ensure perfect radial symmetry using sin/cos.
 
-Rules:
-- Only "circle" and "rectangle" types allowed
-- Maximum 26 shapes total
-- Labels must be max 2 characters
-- Keep all shapes inside the canvas bounds (x: 30-870, y: 30-520)
-- For circles: include radius (15-40)
-- For rectangles: include width (40-120) and height (30-80)
-- Pick vibrant, distinct colors for each shape
+TASK:
+1. First, create a "reasoning" string explaining your spatial calculations.
+2. Then, output the "nodes" array.
 
-Respond with this exact JSON structure:
+JSON STRUCTURE:
 {
+  "reasoning": "I will place a central circle at (450,275) and 6 surrounding nodes at 60-degree intervals with a radius of 200px...",
   "nodes": [
-    {
-      "type": "circle",
-      "x": 400,
-      "y": 200,
-      "radius": 30,
-      "label": "A",
-      "color": "#6366f1"
-    },
-    {
-      "type": "rectangle",
-      "x": 300,
-      "y": 350,
-      "width": 80,
-      "height": 50,
-      "label": "B",
-      "color": "#ec4899"
-    }
+    {"type": "circle", "x": 450, "y": 275, "radius": 35, "label": "C", "color": "#6366f1"},
+    ...
+  ]
+}
+
+EXAMPLE: "5 nodes in a line"
+{
+  "reasoning": "Distributing 5 nodes horizontally at y=275. Spacing = (870-30)/4 = 210px.",
+  "nodes": [
+    {"type": "circle", "x": 30, "y": 275, "radius": 25, "label": "1", "color": "#6366f1"},
+    {"type": "circle", "x": 240, "y": 275, "radius": 25, "label": "2", "color": "#8b5cf6"},
+    {"type": "circle", "x": 450, "y": 275, "radius": 25, "label": "3", "color": "#ec4899"},
+    {"type": "circle", "x": 660, "y": 275, "radius": 25, "label": "4", "color": "#f43f5e"},
+    {"type": "circle", "x": 870, "y": 275, "radius": 25, "label": "5", "color": "#f97316"}
   ]
 }
 `;
 
-let model: GenerativeModel | null = null;
+// AI Clients
+let geminiModel: GenerativeModel | null = null;
+let groqClient: Groq | null = null;
 
-/**
- * Initialize the Gemini model if API key is available
- */
-function getModel(): GenerativeModel | null {
-  if (model) return model;
+function getGroqClient(): Groq | null {
+  if (groqClient) return groqClient;
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey || apiKey.includes('your_api_key')) return null;
 
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey || apiKey === 'your_api_key_here') {
-    console.log('⚠️  No Gemini API key found. Using structured fallback logic.');
+  try {
+    groqClient = new Groq({ apiKey });
+    console.log('✅ Groq AI initialized successfully.');
+    return groqClient;
+  } catch (error) {
+    console.error('❌ Failed to initialize Groq:', error);
     return null;
   }
+}
+
+function getGeminiModel(): GenerativeModel | null {
+  if (geminiModel) return geminiModel;
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey || apiKey.includes('your_api_key')) return null;
 
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
-    model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
-    console.log('✅ Gemini AI model initialized successfully.');
-    return model;
+    geminiModel = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+    console.log('✅ Gemini AI initialized successfully.');
+    return geminiModel;
   } catch (error) {
-    console.error('❌ Failed to initialize Gemini model:', error);
+    console.error('❌ Failed to initialize Gemini:', error);
     return null;
   }
 }
@@ -119,48 +130,65 @@ function clamp(val: number, min: number, max: number): number {
 
 /**
  * Main function: Generate shapes from a prompt
- * Uses Gemini AI if available, falls back to structured logic
+ * Uses Groq (primary), Gemini (secondary), or Fallback
  */
 export async function generateShapes(prompt: string): Promise<ShapeNode[]> {
-  const aiModel = getModel();
-
-  if (!aiModel) {
-    console.log('🔄 Using fallback logic for prompt:', prompt);
-    return generateShapesFallback(prompt);
-  }
+  const activeGroq = getGroqClient();
+  const activeGemini = getGeminiModel();
 
   try {
-    console.log('🤖 Sending prompt to Gemini AI:', prompt);
+    let jsonText = '';
 
-    const result = await aiModel.generateContent([
-      { text: SYSTEM_PROMPT },
-      { text: `User prompt: "${prompt}"` },
-    ]);
+    if (activeGroq) {
+      console.log('🤖 Sending prompt to Groq AI:', prompt);
+      const completion = await activeGroq.chat.completions.create({
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'user', content: `User prompt: "${prompt}"` },
+        ],
+        model: 'llama-3.3-70b-versatile',
+        temperature: 0.1,
+        response_format: { type: 'json_object' },
+      });
+      jsonText = completion.choices[0]?.message?.content || '';
+    } 
+    else if (activeGemini) {
+      console.log('🤖 Sending prompt to Gemini AI:', prompt);
+      const result = await activeGemini.generateContent([
+        { text: SYSTEM_PROMPT },
+        { text: `User prompt: "${prompt}"` },
+      ]);
+      jsonText = result.response.text();
+    } 
+    else {
+      console.log('🔄 No AI key found. Using fallback logic for:', prompt);
+      return generateShapesFallback(prompt);
+    }
 
-    const response = result.response;
-    let text = response.text().trim();
-
-    // Strip markdown code fences if present
+    // Clean up response
+    let text = jsonText.trim();
     if (text.startsWith('```')) {
       text = text.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
     }
 
     const parsed = JSON.parse(text);
-
+    if (parsed.reasoning) {
+      console.log('🧠 AI Reasoning:', parsed.reasoning);
+    }
+    
     if (!parsed.nodes || !Array.isArray(parsed.nodes)) {
-      throw new Error('Invalid AI response: missing nodes array');
+      throw new Error('Invalid AI response format');
     }
 
     const validated = validateNodes(parsed.nodes);
-
-    if (validated.length === 0) {
-      throw new Error('AI returned no valid shapes');
-    }
+    if (validated.length === 0) throw new Error('No valid nodes generated');
 
     console.log(`✅ AI generated ${validated.length} shapes`);
     return validated;
+
   } catch (error) {
     console.error('❌ AI generation failed, using fallback:', error);
     return generateShapesFallback(prompt);
   }
 }
+
